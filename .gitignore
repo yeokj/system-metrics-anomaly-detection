@@ -1,0 +1,11 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# C++
+build/
+*.o
+
+# OS
+.DS_Store
