@@ -42,3 +42,29 @@ void Simulator::trafficGenerator() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
+
+void Simulator::failureInjector() {
+
+}
+
+void Simulator::metricsLogger() {
+    std::ofstream file("../python/data/raw_metrics.csv");
+    file << "timestamp,latency,throughput,error_rate,label\n";
+
+    while (isRunning || !dataQueue.empty()) {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock, [this]{ return !dataQueue.empty() || !isRunning; });
+
+        if (!dataQueue.empty()) {
+            Metric m;
+            m = dataQueue.front();
+            dataQueue.pop();
+
+            lock.unlock();
+
+            file << std::fixed << std::setprecision(6);
+            file << m.timestamp << "," << m.latency << "," << m.throughput << "," << m.error_rate << "," << m.label << "\n";
+        }
+    }
+    file.close();
+}
