@@ -48,7 +48,7 @@ void Simulator::failureInjector() {
 }
 
 void Simulator::metricsLogger() {
-    std::ofstream file("../python/data/raw_metrics.csv");
+    std::ofstream file("python/data/raw_metrics.csv");
     file << "timestamp,latency,throughput,error_rate,label\n";
 
     while (isRunning || !dataQueue.empty()) {
@@ -67,4 +67,27 @@ void Simulator::metricsLogger() {
         }
     }
     file.close();
+}
+
+void Simulator::run() {
+    isRunning = true;
+
+    std::thread worker1(&Simulator::trafficGenerator, this);
+    std::thread worker2(&Simulator::metricsLogger, this);
+
+    // Let the simulation collect data for 10 seconds
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    // Signal the threads to finish
+    stop(); 
+
+    // Now it's safe to join, because stop() broke the while loops
+    worker1.join();
+    worker2.join();
+}
+
+void Simulator::stop() {
+    isRunning = false;
+
+    cv.notify_all();
 }
