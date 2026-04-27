@@ -5,7 +5,15 @@
 #include <condition_variable>
 #include <atomic>
 
-// 1. Data Carrier
+// Enums
+enum class FailureMode {
+    NONE = 0,
+    SPIKE = 1,
+    DRIFT = 2,
+    CONSTANT_HIGH = 3
+};
+
+// Data Carrier
 struct Metric {
     double timestamp = 0.0;    // High-precision time
     double latency;     // System response time
@@ -14,7 +22,7 @@ struct Metric {
     int label;          // 0 = Normal, 1 = Anomaly
 };
 
-// 2. Logic Provider
+// Logic Provider
 class Simulator {
 private:
     std::queue<Metric> dataQueue;
@@ -23,7 +31,7 @@ private:
     std::atomic<bool> isRunning;
 
     // Internal helper for failure states
-    int currentFailureMode; 
+    FailureMode currentFailureMode; 
 
 public:
     Simulator(); // Constructor

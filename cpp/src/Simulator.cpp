@@ -20,6 +20,8 @@ void Simulator::trafficGenerator() {
     std::normal_distribution<double> latencyDist(15.0, 2.0);
     std::normal_distribution<double> throughputDist(100.0, 10.0);
 
+    double driftAccumulator = 0.0;
+
     while (isRunning) {
         Metric m;
         // Use high_resolution_clock for the research-grade precision
@@ -30,6 +32,25 @@ void Simulator::trafficGenerator() {
         m.throughput = throughputDist(gen);
         m.error_rate = 0.01; // Baseline 1% error
         m.label = 0;         // Normal data
+
+        switch (currentFailureMode) {
+            case FailureMode::NONE:
+                driftAccumulator = 0.0;
+                break;
+            case FailureMode::SPIKE:
+                m.latency += 100.0;
+                m.label = 1;
+                break;
+            case FailureMode::DRIFT:
+                driftAccumulator += 1.5;
+                m.latency += driftAccumulator;
+                m.label = 1;
+                break;
+            case FailureMode::CONSTANT_HIGH:
+                m.latency += 40.0;
+                m.label = 1;
+                break;
+        }
 
         // 3. Thread-Safe Push
         {
