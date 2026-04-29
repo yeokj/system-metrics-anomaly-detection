@@ -5,7 +5,7 @@
 #include <fstream>
 #include <iomanip>
 
-Simulator::Simulator() : isRunning(false), currentFailureMode(0) {}
+Simulator::Simulator() : isRunning(false), currentFailureMode(FailureMode::NONE) {}
 
 Simulator::~Simulator() {
     stop();
@@ -65,7 +65,20 @@ void Simulator::trafficGenerator() {
 }
 
 void Simulator::failureInjector() {
+    // Baseline
+    currentFailureMode = FailureMode::NONE;
+    std::this_thread::sleep_for(std::chrono::seconds(3));
 
+    // Sudden Spike
+    currentFailureMode = FailureMode::SPIKE;
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Recovery
+    currentFailureMode = FailureMode::NONE;
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    // The Growing Leak
+    currentFailureMode = FailureMode::DRIFT;
 }
 
 void Simulator::metricsLogger() {
@@ -95,6 +108,7 @@ void Simulator::run() {
 
     std::thread worker1(&Simulator::trafficGenerator, this);
     std::thread worker2(&Simulator::metricsLogger, this);
+    std::thread worker3(&Simulator::failureInjector, this);
 
     // Let the simulation collect data for 10 seconds
     std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -105,6 +119,7 @@ void Simulator::run() {
     // Now it's safe to join, because stop() broke the while loops
     worker1.join();
     worker2.join();
+    worker3.join();
 }
 
 void Simulator::stop() {
