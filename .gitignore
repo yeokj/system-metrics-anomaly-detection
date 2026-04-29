@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 python/data/*.csv
 .ipynb_checkpoints/
+*.json
 
 # C++
 cpp/build/
