@@ -26,15 +26,33 @@ def load_simulation_data(file_path):
         print(f"An unexpected error has occured: {e}")
         return None
     
-
+# Logic to add 'latency_roll_mean', 'latency_roll_std', etc.
 def apply_rolling_features(df, window_size=10):
-    # Logic to add 'latency_roll_mean', 'latency_roll_std', etc.
-    df
-    pass
+    metrics = ['latency', 'throughput', 'error_rate']
 
+    for metric in metrics:
+        df[f'{metric}_roll_mean'] = df[metric].rolling(window=window_size).mean()
+        df[f'{metric}_roll_std'] = df[metric].rolling(window=window_size).std()
+
+    df = df.dropna()
+
+    return df
+
+# The main execution flow
 if __name__ == "__main__":
-    # The main execution flow: 
-    # 1. Load 
-    # 2. Transform
-    # 3. Save to 'processed_metrics.csv'
-    pass
+    input_path = 'data/raw_metrics.csv'
+    output_path = 'data/processed_metrics.csv'
+    
+    # 1. Load the data
+    raw_df = load_simulation_data(input_path)
+    
+    if raw_df is not None:
+        # 2. Transform the data
+        processed_df = apply_rolling_features(raw_df, window_size=10)
+        
+        # 3. Save to 'processed_metrics.csv'
+        processed_df.to_csv(output_path)
+        print(f"Preprocessing complete. Saved processed data to {output_path}")
+        
+        # Research Check: Peek at the first few rows to verify the new columns
+        print(processed_df.head())
