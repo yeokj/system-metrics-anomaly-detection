@@ -1,9 +1,11 @@
 #include "Metrics.h"
+#include "DetectionEngine.h"
 #include <random>
 #include <chrono>
 #include <thread>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 
 Simulator::Simulator() : isRunning(false), currentFailureMode(FailureMode::NONE) {}
 
@@ -82,8 +84,17 @@ void Simulator::failureInjector() {
 }
 
 void Simulator::metricsLogger() {
+    DetectionEngine engine;
+    if (!engine.loadConfiguration("python/data/model_params.json")) {
+        std::cerr << "Phase 3 Error: Could not load model_params.json" << std::endl;
+        return;
+    }
+
     std::ofstream file("python/data/raw_metrics.csv");
-    file << "timestamp,latency,throughput,error_rate,label\n";
+    file << "timestamp,latency,throughput,error_rate,label,detected_anomaly,overhead_us\n";
+
+    double totalOverhead = 0.0;
+    int checkCount = 0;
 
     while (isRunning || !dataQueue.empty()) {
         std::unique_lock<std::mutex> lock(mtx);
@@ -93,13 +104,32 @@ void Simulator::metricsLogger() {
             Metric m;
             m = dataQueue.front();
             dataQueue.pop();
-
             lock.unlock();
 
+            // Execute & Time the Detection Engine (Research Variable)
+            auto start = std::chrono::high_resolution_clock::now();
+            
+            bool isDetected = engine.validateMetric(m);
+            
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+            totalOverhead += duration;
+            checkCount++;
+
             file << std::fixed << std::setprecision(6);
-            file << m.timestamp << "," << m.latency << "," << m.throughput << "," << m.error_rate << "," << m.label << "\n";
+            file << m.timestamp << "," << m.latency << "," << m.throughput << "," << m.error_rate << "," << m.label << "," << (isDetected ? 1 : 0) << "," << duration << "\n";
         }
     }
+
+    // Output Research Summary
+    if (checkCount > 0) {
+        std::cout << "\n--- Phase 3 Research Results ---" << std::endl;
+        std::cout << "Total Checks Performed: " << checkCount << std::endl;
+        std::cout << "Avg CPU Overhead: " << (totalOverhead / checkCount) << " us" << std::endl;
+        std::cout << "--------------------------------\n" << std::endl;
+    }
+
     file.close();
 }
 
