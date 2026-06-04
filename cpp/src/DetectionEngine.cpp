@@ -3,7 +3,7 @@
 #include <cmath>
 #include <iostream>
 
-bool DetectionEngine::loadConfiguration(const std::string& configPath) {
+bool DetectionEngine::loadConfiguration(const std::string &configPath) {
     std::ifstream file(configPath);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open config file at " << configPath << std::endl;
@@ -30,14 +30,14 @@ bool DetectionEngine::loadConfiguration(const std::string& configPath) {
     return true;
 }
 
-bool DetectionEngine::validateMetric(const Metric& m, double zThreshold) {
+bool DetectionEngine::validateMetric(const TelemetryMetric &tm, double zThreshold) {
     bool isAnomalous = false;
 
     // 1. Check Latency
     if (thresholds.count("latency_roll_mean")) {
         auto& p = thresholds["latency_roll_mean"];
         if (p.std_dev > 0) {
-            double z = std::abs((m.latency - p.mean) / p.std_dev);
+            double z = std::abs((tm.latency - p.mean) / p.std_dev);
             if (z > zThreshold) isAnomalous = true;
         }
     }
@@ -46,7 +46,7 @@ bool DetectionEngine::validateMetric(const Metric& m, double zThreshold) {
     if (!isAnomalous && thresholds.count("throughput_roll_mean")) {
         auto& p = thresholds["throughput_roll_mean"];
         if (p.std_dev > 0) {
-            double z = std::abs((m.throughput - p.mean) / p.std_dev);
+            double z = std::abs((tm.throughput - p.mean) / p.std_dev);
             if (z > zThreshold) isAnomalous = true;
         }
     }
@@ -55,7 +55,7 @@ bool DetectionEngine::validateMetric(const Metric& m, double zThreshold) {
     if (!isAnomalous && thresholds.count("error_rate_roll_mean")) {
         auto& p = thresholds["error_rate_roll_mean"];
         if (p.std_dev > 0) {
-            double z = std::abs((m.error_rate - p.mean) / p.std_dev);
+            double z = std::abs((tm.error_rate - p.mean) / p.std_dev);
             if (z > zThreshold) isAnomalous = true;
         }
     }
