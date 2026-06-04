@@ -14,7 +14,7 @@ enum class FailureMode {
 };
 
 // Data Carrier
-struct Metric {
+struct TelemetryMetric {
     double timestamp = 0.0;    // High-precision time
     double latency;     // System response time
     double throughput;  // Requests processed
@@ -25,7 +25,7 @@ struct Metric {
 // Logic Provider
 class Simulator {
 private:
-    std::queue<Metric> dataQueue;
+    std::queue<TelemetryMetric> dataQueue;
     std::mutex mtx;
     std::condition_variable cv;
     std::atomic<bool> isRunning;
