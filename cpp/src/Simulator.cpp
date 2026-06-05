@@ -25,39 +25,39 @@ void Simulator::trafficGenerator() {
     double driftAccumulator = 0.0;
 
     while (isRunning) {
-        Metric m;
+        TelemetryMetric tm;
         // Use high_resolution_clock for the research-grade precision
         auto now = std::chrono::steady_clock::now();
-        m.timestamp = std::chrono::duration<double>(now.time_since_epoch()).count();
+        tm.timestamp = std::chrono::duration<double>(now.time_since_epoch()).count();
         
-        m.latency = latencyDist(gen);
-        m.throughput = throughputDist(gen);
-        m.error_rate = 0.01; // Baseline 1% error
-        m.label = 0;         // Normal data
+        tm.latency = latencyDist(gen);
+        tm.throughput = throughputDist(gen);
+        tm.error_rate = 0.01; // Baseline 1% error
+        tm.label = 0;         // Normal data
 
         switch (currentFailureMode) {
             case FailureMode::NONE:
                 driftAccumulator = 0.0;
                 break;
             case FailureMode::SPIKE:
-                m.latency += 100.0;
-                m.label = 1;
+                tm.latency += 100.0;
+                tm.label = 1;
                 break;
             case FailureMode::DRIFT:
                 driftAccumulator += 1.5;
-                m.latency += driftAccumulator;
-                m.label = 1;
+                tm.latency += driftAccumulator;
+                tm.label = 1;
                 break;
             case FailureMode::CONSTANT_HIGH:
-                m.latency += 40.0;
-                m.label = 1;
+                tm.latency += 40.0;
+                tm.label = 1;
                 break;
         }
 
         // 3. Thread-Safe Push
         {
             std::lock_guard<std::mutex> lock(mtx);
-            dataQueue.push(m);
+            dataQueue.push(tm);
         }
         cv.notify_one(); // Wake up the logger
 
@@ -97,19 +97,19 @@ void Simulator::metricsLogger() {
     int checkCount = 0;
 
     while (isRunning || !dataQueue.empty()) {
-        std::unique_lock<std::mutex> lock(mtx);
-        cv.wait(lock, [this]{ return !dataQueue.empty() || !isRunning; });
-
         if (!dataQueue.empty()) {
-            Metric m;
-            m = dataQueue.front();
-            dataQueue.pop();
-            lock.unlock();
+            TelemetryMetric tm;
+            {
+                std::unique_lock<std::mutex> lock(mtx);
+                cv.wait(lock, [this]{ return !dataQueue.empty() || !isRunning; });
+                tm = dataQueue.front();
+                dataQueue.pop();
+            }
 
             // Execute & Time the Detection Engine (Research Variable)
             auto start = std::chrono::high_resolution_clock::now();
             
-            bool isDetected = engine.validateMetric(m);
+            bool isDetected = engine.validateMetric(tm);
             
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -118,13 +118,19 @@ void Simulator::metricsLogger() {
             checkCount++;
 
             file << std::fixed << std::setprecision(6);
-            file << m.timestamp << "," << m.latency << "," << m.throughput << "," << m.error_rate << "," << m.label << "," << (isDetected ? 1 : 0) << "," << duration << "\n";
+            file << tm.timestamp << "," 
+            << tm.latency << "," 
+            << tm.throughput << "," 
+            << tm.error_rate << "," 
+            << tm.label << "," 
+            << (isDetected ? 1 : 0) << "," 
+            << duration << "\n";
         }
     }
 
-    // Output Research Summary
+    // Output Summary
     if (checkCount > 0) {
-        std::cout << "\n--- Phase 3 Research Results ---" << std::endl;
+        std::cout << "\n--- Telemetry Inference Summary ---" << std::endl;
         std::cout << "Total Checks Performed: " << checkCount << std::endl;
         std::cout << "Avg CPU Overhead: " << (totalOverhead / checkCount) << " us" << std::endl;
         std::cout << "--------------------------------\n" << std::endl;
@@ -154,6 +160,5 @@ void Simulator::run() {
 
 void Simulator::stop() {
     isRunning = false;
-
     cv.notify_all();
 }
