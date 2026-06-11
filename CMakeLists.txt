@@ -5,7 +5,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find Protobuf compiler and libraries, and gRPC package and its internal C++ plugin target
-find_package(gRPC CONFIG REQUIRED)
+find_package(gRPC CONFIG QUIET)
+if(gRPC_FOUND)
+    message(STATUS "Found gRPC via CMake Config")
+    set(GRPC_LIBRARIES gRPC::grpc++)
+    set(GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
+else()
+    # Fallback to pkg-config if CMake Config files are missing (works on Ubuntu Apt)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GRPC REQUIRED grpc++)
+    message(STATUS "Found gRPC via PkgConfig")
+    set(GRPC_LIBRARIES ${GRPC_LIBRARIES})
+
+    find_program(GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
+endif()
+
 find_package(Protobuf REQUIRED)
 
 # Paths to store the generated source files
@@ -20,7 +34,7 @@ add_custom_command(
     COMMAND ${Protobuf_PROTOC_EXECUTABLE}
     ARGS --cpp_out="${CMAKE_CURRENT_BINARY_DIR}"
          --grpc_out="${CMAKE_CURRENT_BINARY_DIR}"
-         --plugin=protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
+         --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN_EXECUTABLE}
          -I "${CMAKE_CURRENT_SOURCE_DIR}/cpp/proto"
          "${CMAKE_CURRENT_SOURCE_DIR}/cpp/proto/metrics.proto"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/cpp/proto/metrics.proto"
@@ -50,12 +64,12 @@ find_package(Threads REQUIRED)
 target_link_libraries(TelemetryGenerator 
     PRIVATE 
         Threads::Threads
-        gRPC::grpc++
+        ${GRPC_LIBRARIES}
         protobuf::libprotobuf
 )
 target_link_libraries(InferenceServer 
     PRIVATE 
     Threads::Threads
-    gRPC::grpc++
+    ${GRPC_LIBRARIES}
     protobuf::libprotobuf
 )
