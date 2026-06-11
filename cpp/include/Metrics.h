@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <grpcpp/support/sync_stream.h>
+#include "metrics.pb.h"
 
 // Enums
 enum class FailureMode {
