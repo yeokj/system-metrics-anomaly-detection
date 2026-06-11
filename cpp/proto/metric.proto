@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package telemetry;
+
+message TelemetryMetric {
+    int64 timestamp = 1;
+    double latency = 2;
+    double throughput = 3;
+    double error_rate = 4;
+}
+
+service AnomalyDetectorService {
+    rpc StreamMetrics (stream TelemetryMetric) returns (StreamStatus);
+}
+
+message StreamStatus {
+    bool success = 1;
+    string message = 2;
+}
