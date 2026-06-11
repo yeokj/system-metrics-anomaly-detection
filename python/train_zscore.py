@@ -7,15 +7,17 @@ def calculate_baseline(df):
 
     baseline_params = {}
 
-    metrics = ['latency_roll_mean', 'latency_roll_std', 
-               'throughput_roll_mean', 'throughput_roll_std', 
-               'error_rate_roll_mean', 'error_rate_roll_std']
+    metrics = ['latency', 'throughput', 'error_rate']
     
     for metric in metrics:
         mean_val = normal_data[metric].mean()
         std_val = normal_data[metric].std()
 
-        baseline_params[metric] = {
+        baseline_params[f"{metric}_roll_mean"] = {
+            'mean': mean_val,
+            'std': std_val
+        }
+        baseline_params[f"{metric}_roll_std"] = {
             'mean': mean_val,
             'std': std_val
         }
