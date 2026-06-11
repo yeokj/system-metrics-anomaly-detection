@@ -1,0 +1,26 @@
+{
+    "latency_roll_mean": {
+        "mean": 23.1068521125,
+        "std": 18.031228217465202
+    },
+    "latency_roll_std": {
+        "mean": 12.417239718190647,
+        "std": 20.031341734949578
+    },
+    "throughput_roll_mean": {
+        "mean": 100.0805870275,
+        "std": 1.486147908433985
+    },
+    "throughput_roll_std": {
+        "mean": 8.491702262328674,
+        "std": 2.735505925537425
+    },
+    "error_rate_roll_mean": {
+        "mean": 0.01,
+        "std": 0.0
+    },
+    "error_rate_roll_std": {
+        "mean": 0.0,
+        "std": 0.0
+    }
+}
