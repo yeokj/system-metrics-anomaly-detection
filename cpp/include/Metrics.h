@@ -4,9 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-
-namespace grpc { template <typename W> class ClientWriter; }
-namespace telemetry { class TelemetryMetric; }
+#include <grpcpp/support/sync_stream.h>
 
 // Enums
 enum class FailureMode {
