@@ -6,6 +6,9 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <grpcpp/grpcpp.h>
+#include "metrics.pb.h"
+#include "metrics.grpc.pb.h"
 
 Simulator::Simulator() : isRunning(false), currentFailureMode(FailureMode::NONE) {}
 
@@ -83,7 +86,7 @@ void Simulator::failureInjector() {
     currentFailureMode = FailureMode::DRIFT;
 }
 
-void Simulator::metricsLogger() {
+void Simulator::metricsLogger(grpc::ClientWriter<telemetry::TelemetryMetric>* writer) {
     DetectionEngine engine;
     if (!engine.loadConfiguration("python/data/model_params.json")) {
         std::cerr << "Phase 3 Error: Could not load model_params.json" << std::endl;
@@ -104,6 +107,19 @@ void Simulator::metricsLogger() {
                 cv.wait(lock, [this]{ return !dataQueue.empty() || !isRunning; });
                 tm = dataQueue.front();
                 dataQueue.pop();
+            }
+
+            if (writer != nullptr) {
+                telemetry::TelemetryMetric proto_packet;
+                
+                // Map your local queue values (tm) directly to the protobuf setters
+                proto_packet.set_timestamp(tm.timestamp);
+                proto_packet.set_latency(tm.latency);
+                proto_packet.set_throughput(tm.throughput);
+                proto_packet.set_error_rate(tm.error_rate);
+
+                // Fire the message over the network stream
+                writer->Write(proto_packet);
             }
 
             // Execute & Time the Detection Engine (Research Variable)
@@ -128,6 +144,11 @@ void Simulator::metricsLogger() {
         }
     }
 
+    // Notify the server we are closing the stream:
+    if (writer != nullptr) {
+        writer->WritesDone();
+    }
+
     // Output Summary
     if (checkCount > 0) {
         std::cout << "\n--- Telemetry Inference Summary ---" << std::endl;
@@ -139,11 +160,11 @@ void Simulator::metricsLogger() {
     file.close();
 }
 
-void Simulator::run() {
+void Simulator::run(grpc::ClientWriter<telemetry::TelemetryMetric>* writer) {
     isRunning = true;
 
     std::thread worker1(&Simulator::trafficGenerator, this);
-    std::thread worker2(&Simulator::metricsLogger, this);
+    std::thread worker2(&Simulator::metricsLogger, this, writer);
     std::thread worker3(&Simulator::failureInjector, this);
 
     // Let the simulation collect data for 10 seconds

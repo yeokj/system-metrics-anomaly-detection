@@ -5,8 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find Protobuf compiler and libraries, and gRPC package and its internal C++ plugin target
-find_package(Protobuf REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
+find_package(Protobuf REQUIRED)
 
 # Paths to store the generated source files
 set(PROTO_SRCS "${CMAKE_CURRENT_BINARY_DIR}/metrics.pb.cc")
@@ -30,6 +30,7 @@ add_custom_command(
 add_executable(TelemetryGenerator 
     cpp/apps/telemetry_generator.cpp 
     cpp/src/Simulator.cpp
+    cpp/src/DetectionEngine.cpp
     ${PROTO_SRCS}
     ${GRPC_SRCS}
 )

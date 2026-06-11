@@ -5,6 +5,9 @@
 #include <condition_variable>
 #include <atomic>
 
+namespace grpc { template <typename W> class ClientWriter; }
+namespace telemetry { class TelemetryMetric; }
+
 // Enums
 enum class FailureMode {
     NONE = 0,
@@ -40,10 +43,10 @@ public:
     // Core Threads
     void trafficGenerator();
     void failureInjector();
-    void metricsLogger();
+    void metricsLogger(grpc::ClientWriter<telemetry::TelemetryMetric>* writer);
 
     // Controller
-    void run();
+    void run(grpc::ClientWriter<telemetry::TelemetryMetric>* writer);
     void stop();
 };
 
