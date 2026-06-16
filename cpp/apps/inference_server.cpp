@@ -8,6 +8,7 @@
 #include "metrics.pb.h"
 #include "metrics.grpc.pb.h"
 #include "DetectionEngine.h"
+#include "LockFreeSPSCQueue.h"
 
 std::atomic<bool> should_shutdown(false);
 
@@ -18,12 +19,28 @@ void SignalHandler(int signum) {
 class AnomalyDetectorServiceImpl final : public telemetry::AnomalyDetectorService::Service {
 private:
     DetectionEngine engine;
-    
+    LockFreeSPSCQueue<TelemetryMetric, 2048> metricQueue;
+    std::thread inferenceWorker;
+
+    void inferenceWorkerLoop() {
+        TelemetryMetric native_metric;
+
+        while (!should_shutdown.load()) {
+            if (metricQueue.pop(native_metric)) {
+                engine.validateMetric(native_metric);
+            }
+            else {
+                std::this_thread::yield();
+            }
+        }
+    }
+
 public:
     AnomalyDetectorServiceImpl() {
         if (!engine.loadConfiguration("python/data/model_params.json")) {
             std::cerr << "[Server Warning] Could not load model_params.json!" << std::endl;
-        } else {
+        } 
+        else {
             std::cout << "[Server] DetectionEngine successfully loaded model parameters." << std::endl;
         }
     }
