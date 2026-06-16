@@ -60,7 +60,6 @@ public:
         
         telemetry::TelemetryMetric proto_metric;
         int count = 0;
-        int anomalies_detected = 0;
 
         std::cout << "[Server] Telemetry stream opened by client." << std::endl;
 
@@ -77,13 +76,11 @@ public:
             native_metric.throughput = proto_metric.throughput();
             native_metric.error_rate = proto_metric.error_rate();
 
-            // Execute your ML Inference validation on the live data point
-            bool isAnomaly = engine.validateMetric(native_metric);
-            
-            if (isAnomaly) {
-                ++anomalies_detected;
-                std::cout << "[ALERT] Anomaly detected! Latency: " << native_metric.latency 
-                          << "ms | Error Rate: " << native_metric.error_rate * 100 << "%" << std::endl;
+            while (!metricQueue.push(native_metric)) {
+                if (should_shutdown.load()) {
+                    break;
+                }
+                std::this_thread::yield();
             }
         }
 
