@@ -42,6 +42,13 @@ public:
         } 
         else {
             std::cout << "[Server] DetectionEngine successfully loaded model parameters." << std::endl;
+            inferenceWorker = std::thread(&AnomalyDetectorServiceImpl::inferenceWorkerLoop, this);
+        }
+    }
+
+    ~AnomalyDetectorServiceImpl() {
+        if (inferenceWorker.joinable()) {
+            inferenceWorker.join();
         }
     }
 
