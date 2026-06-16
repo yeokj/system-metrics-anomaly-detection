@@ -2,9 +2,9 @@
 .venv/
 __pycache__/
 *.pyc
-python/data/*.csv
+python/data/*
+!python/data/model_params.json
 .ipynb_checkpoints/
-*.json
 
 # C++
 cpp/build/
