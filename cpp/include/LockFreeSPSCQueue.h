@@ -34,4 +34,20 @@ bool LockFreeSPSCQueue<T, Capacity>::push(const T &item) {
     return true;
 }
 
+template <typename T, size_t Capacity>
+bool LockFreeSPSCQueue<T, Capacity>::pop(T &item) {
+    // Your pop logic goes here
+    size_t currHead = head.load(std::memory_order_relaxed);
+    size_t currTail = tail.load(std::memory_order_acquire);
+
+    if (currHead == currTail) return false;
+
+    item = storage[currHead];
+
+    size_t nextHead = (currHead + 1) & (Capacity - 1);
+    head.store(nextHead, std::memory_order_release);
+
+    return true;
+}
+
 #endif
