@@ -66,6 +66,7 @@ target_link_libraries(TelemetryGenerator
         Threads::Threads
         ${GRPC_LIBRARIES}
         protobuf::libprotobuf
+        sqlite3
 )
 target_link_libraries(InferenceServer 
     PRIVATE 
