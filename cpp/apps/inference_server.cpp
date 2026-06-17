@@ -21,6 +21,7 @@ private:
     DetectionEngine engine;
     LockFreeSPSCQueue<TelemetryMetric, 2048> metricQueue;
     std::thread inferenceWorker;
+    std::thread dbWorker;
 
     void inferenceWorkerLoop() {
         TelemetryMetric native_metric;
@@ -45,11 +46,19 @@ public:
             std::cout << "[Server] DetectionEngine successfully loaded model parameters." << std::endl;
             inferenceWorker = std::thread(&AnomalyDetectorServiceImpl::inferenceWorkerLoop, this);
         }
+        // Launch the DB worker thread here, passing the engine instance and the global flag reference
+        dbWorker = std::thread(&DetectionEngine::dbWorkerLoop, &engine, std::ref(should_shutdown));
     }
 
     ~AnomalyDetectorServiceImpl() {
+        engine.stopAlertWorker();
+
         if (inferenceWorker.joinable()) {
             inferenceWorker.join();
+        }
+
+        if (dbWorker.joinable()) {
+            dbWorker.join();
         }
     }
 
