@@ -72,4 +72,5 @@ target_link_libraries(InferenceServer
     Threads::Threads
     ${GRPC_LIBRARIES}
     protobuf::libprotobuf
+    sqlite3
 )
