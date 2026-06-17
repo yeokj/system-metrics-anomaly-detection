@@ -27,6 +27,7 @@ private:
 
         while (!should_shutdown.load()) {
             if (metricQueue.pop(native_metric)) {
+                engine.updateWindow(native_metric);
                 engine.validateMetric(native_metric);
             }
             else {
