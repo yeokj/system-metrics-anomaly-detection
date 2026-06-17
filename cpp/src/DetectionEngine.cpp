@@ -65,9 +65,9 @@ bool DetectionEngine::validateMetric(const TelemetryMetric &tm, double zThreshol
 
 void DetectionEngine::updateWindow(const TelemetryMetric &tm) {
     metricsWindow.push_back(tm);
-    int64_t threshold = tm.timestamp() - 300;
+    int64_t threshold = tm.timestamp - 300;
 
-    while (!metricsWindow.empty() && metricsWindow.front().timestamp() < threshold) {
+    while (!metricsWindow.empty() && metricsWindow.front().timestamp < threshold) {
         metricsWindow.pop_front();
     }
 }
