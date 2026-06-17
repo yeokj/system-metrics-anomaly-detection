@@ -5,6 +5,7 @@
 #include "json.hpp"
 #include <string>
 #include <map>
+#include <deque>
 
 using json = nlohmann::json;
 
@@ -24,6 +25,7 @@ public:
 
 private:
     std::map<std::string, ModelParams> thresholds;
+    std::deque<TelemetryMetric> metricsWindow;
 };
 
 #endif
