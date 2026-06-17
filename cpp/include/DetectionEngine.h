@@ -21,12 +21,15 @@ public:
 
     // Core: Validates a metric against loaded Z-score thresholds. Returns true if an anomaly is detected
     bool validateMetric(const TelemetryMetric &tm, double zThreshold = 3.0);
-    
+
     void updateWindow(const TelemetryMetric &tm);
 
 private:
     std::map<std::string, ModelParams> thresholds;
     std::deque<TelemetryMetric> metricsWindow;
+    std::queue<AnomalyAlert> alertQueue_;
+    std::mutex alertMutex_;
+    std::condition_variable alertCv_;
 };
 
 #endif
