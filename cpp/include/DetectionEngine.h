@@ -24,6 +24,8 @@ public:
 
     void updateWindow(const TelemetryMetric &tm);
 
+    void dbWorkerLoop(const std::atomic<bool> &should_shutdown);
+
 private:
     std::map<std::string, ModelParams> thresholds;
     std::deque<TelemetryMetric> metricsWindow;

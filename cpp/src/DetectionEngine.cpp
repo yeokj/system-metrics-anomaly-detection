@@ -94,3 +94,21 @@ void DetectionEngine::updateWindow(const TelemetryMetric &tm) {
         metricsWindow.pop_front();
     }
 }
+
+void DetectionEngine::dbWorkerLoop(const std::atomic<bool> &should_shutdown) {
+    while (!should_shutdown.load()) {
+        std::unique_lock<std::mutex> lock(alertMutex_);
+        alertCv_.wait(lock, [this, &should_shutdown]() { 
+            return !alertQueue_.empty() || should_shutdown.load(); 
+        });
+        // Break out if shutdown is requested and no more alerts are left to write
+        if (alertQueue_.empty() && should_shutdown.load()) {
+            break;
+        }
+        AnomalyAlert alert = alertQueue_.front();
+        alertQueue_.pop();
+        lock.unlock();
+
+        std::cout << "[DB WORKER] Async Logging Anomaly: " << alert.metric_type << " breached with value " << alert.violated_value << "\n";
+    }
+}
