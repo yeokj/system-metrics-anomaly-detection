@@ -31,6 +31,8 @@ bool DetectionEngine::loadConfiguration(const std::string &configPath) {
 }
 
 bool DetectionEngine::validateMetric(const TelemetryMetric &tm, double zThreshold) {
+    AnomalyAlert alert;
+    alert.timestamp = static_cast<int64_t>(tm.timestamp);
     bool isAnomalous = false;
 
     // 1. Check Latency
@@ -38,7 +40,12 @@ bool DetectionEngine::validateMetric(const TelemetryMetric &tm, double zThreshol
         auto& p = thresholds["latency_roll_mean"];
         if (p.std_dev > 0) {
             double z = std::abs((tm.latency - p.mean) / p.std_dev);
-            if (z > zThreshold) isAnomalous = true;
+            if (z > zThreshold) { 
+                isAnomalous = true;
+                alert.metric_type = "latency";
+                alert.violated_value = tm.latency;
+                alert.threshold_boundary = p.mean;
+            }
         }
     }
 
@@ -47,7 +54,12 @@ bool DetectionEngine::validateMetric(const TelemetryMetric &tm, double zThreshol
         auto& p = thresholds["throughput_roll_mean"];
         if (p.std_dev > 0) {
             double z = std::abs((tm.throughput - p.mean) / p.std_dev);
-            if (z > zThreshold) isAnomalous = true;
+            if (z > zThreshold) { 
+                isAnomalous = true;
+                alert.metric_type = "throughput";
+                alert.violated_value = tm.throughput;
+                alert.threshold_boundary = p.mean;
+            }
         }
     }
 
@@ -56,8 +68,19 @@ bool DetectionEngine::validateMetric(const TelemetryMetric &tm, double zThreshol
         auto& p = thresholds["error_rate_roll_mean"];
         if (p.std_dev > 0) {
             double z = std::abs((tm.error_rate - p.mean) / p.std_dev);
-            if (z > zThreshold) isAnomalous = true;
+            if (z > zThreshold) { 
+                isAnomalous = true;
+                alert.metric_type = "error_rate";
+                alert.violated_value = tm.error_rate;
+                alert.threshold_boundary = p.mean;
+            }
         }
+    }
+
+    if (isAnomalous) {
+        std::lock_guard<std::mutex> lock(alertMutex_);
+        alertQueue_.push(alert);
+        alertCv_.notify_one();
     }
 
     return isAnomalous;
