@@ -4,6 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <string>
 #include <grpcpp/support/sync_stream.h>
 #include "metrics.pb.h"
 
@@ -22,6 +23,13 @@ struct TelemetryMetric {
     double throughput;  // Requests processed
     double error_rate;  // Percentage of failed requests
     int label;          // 0 = Normal, 1 = Anomaly
+};
+
+struct AnomalyAlert {
+    int64_t timestamp;
+    std::string metric_type;
+    double violated_value;
+    double threshold_boundary;
 };
 
 // Logic Provider
