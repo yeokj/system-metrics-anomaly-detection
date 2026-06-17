@@ -26,6 +26,7 @@ public:
 private:
     std::map<std::string, ModelParams> thresholds;
     std::deque<TelemetryMetric> metricsWindow;
+    void updateWindow(const TelemetryMetric &tm);
 };
 
 #endif
