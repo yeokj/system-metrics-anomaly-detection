@@ -26,6 +26,8 @@ public:
 
     void dbWorkerLoop(const std::atomic<bool> &should_shutdown);
 
+    void stopAlertWorker();
+
 private:
     std::map<std::string, ModelParams> thresholds;
     std::deque<TelemetryMetric> metricsWindow;

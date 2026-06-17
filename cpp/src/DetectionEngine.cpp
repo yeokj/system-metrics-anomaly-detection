@@ -112,3 +112,7 @@ void DetectionEngine::dbWorkerLoop(const std::atomic<bool> &should_shutdown) {
         std::cout << "[DB WORKER] Async Logging Anomaly: " << alert.metric_type << " breached with value " << alert.violated_value << "\n";
     }
 }
+
+void DetectionEngine::stopAlertWorker() {
+    alertCv_.notify_all();
+}
