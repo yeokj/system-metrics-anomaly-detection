@@ -1,17 +1,19 @@
 # Multi-stage build: Compilation environment
-FROM alpine:3.19 AS builder
+FROM ubuntu:24.04 AS builder
 
 LABEL org.opencontainers.image.source="https://github.com/yeokj/system-metrics-anomaly-detection"
 
 # Install development tools and dependency headers
-RUN apk add --no-cache \
-    build-base \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     cmake \
-    grpc-dev \
-    protobuf-dev \
-    libpq-dev \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/community \
-    libpqxx-dev
+    libgrpc++-dev \
+    protobuf-compiler-grpc \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libpqxx-dev \
+    libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -19,26 +21,23 @@ WORKDIR /app
 COPY . .
 
 # Build release binaries via CMake
-RUN rm -rf build && \
-    mkdir build && \
+RUN rm -rf build && mkdir build && \
     cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && \
     make -j$(nproc)
 
 # Multi-stage build: Minimal runtime environment
-FROM alpine:3.19
+FROM ubuntu:24.04
 
 WORKDIR /app
 
 # Install dynamic runtime shared libraries
-RUN apk add --no-cache \
-    libstdc++ \
-    libgcc \
-    grpc \
-    protobuf \
-    libpq \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/community \
-    libpqxx
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgrpc++1.51t64 \
+    libprotobuf32t64 \
+    libpq5 \
+    libpqxx-7.8t64 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Transfer compiled executable artifacts from builder stage
 COPY --from=builder /app/build/TelemetryGenerator /app/bin/TelemetryGenerator
