@@ -10,7 +10,7 @@ RUN apk add --no-cache \
     grpc-dev \
     protobuf-dev \
     libpq-dev \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/testing \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/community \
     libpqxx-dev
 
 WORKDIR /app
@@ -19,7 +19,8 @@ WORKDIR /app
 COPY . .
 
 # Build release binaries via CMake
-RUN mkdir build && \
+RUN rm -rf build && \
+    mkdir build && \
     cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release .. && \
     make -j$(nproc)
@@ -36,7 +37,7 @@ RUN apk add --no-cache \
     grpc \
     protobuf \
     libpq \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/testing \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/community \
     libpqxx
 
 # Transfer compiled executable artifacts from builder stage
