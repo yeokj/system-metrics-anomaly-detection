@@ -156,14 +156,12 @@ void DetectionEngine::dbWorkerLoop(const std::atomic<bool> &should_shutdown) {
             try {
                 // Stream the record straight across the internet via transaction contexts
                 pqxx::work write_tx(c);
-                write_tx.exec(
+                write_tx.exec_params(
                     "INSERT INTO anomaly_alerts (timestamp, metric_type, violated_value, threshold_boundary) VALUES ($1, $2, $3, $4);", 
-                    pqxx::params{
-                        alert.timestamp, 
-                        alert.metric_type, 
-                        alert.violated_value, 
-                        alert.threshold_boundary
-                    }
+                    alert.timestamp, 
+                    alert.metric_type, 
+                    alert.violated_value, 
+                    alert.threshold_boundary
                 );
                 write_tx.commit(); // Finishes cloud synchronization transaction cleanly
                 
