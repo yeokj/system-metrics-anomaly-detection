@@ -1,8 +1,8 @@
 #include "DetectionEngine.h"
 #include <fstream>
 #include <cmath>
+#include <pqxx/pqxx>
 #include <iostream>
-#include <sqlite3.h>
 
 bool DetectionEngine::loadConfiguration(const std::string &configPath) {
     std::ifstream file(configPath);
@@ -97,79 +97,88 @@ void DetectionEngine::updateWindow(const TelemetryMetric &tm) {
 }
 
 void DetectionEngine::dbWorkerLoop(const std::atomic<bool> &should_shutdown) {
-    sqlite3 *db = nullptr;
-    
-    // Open (or create) the anomalies.db local relational file
-    if (sqlite3_open("anomalies.db", &db) != SQLITE_OK) {
-        std::cerr << "[DB WORKER ERROR] Failed to open local database: " << sqlite3_errmsg(db) << std::endl;
-        if (db) sqlite3_close(db);
-        return;
-    }
-    
-    // Auto-initialize the relational table schema on startup
-    const char *createTableSQL = 
-        "CREATE TABLE IF NOT EXISTS anomaly_alerts ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "timestamp BIGINT NOT NULL,"
-        "metric_type TEXT NOT NULL,"
-        "violated_value REAL NOT NULL,"
-        "threshold_boundary REAL NOT NULL"
-        ");";
-        
-    char *errMsg = nullptr;
-    if (sqlite3_exec(db, createTableSQL, nullptr, nullptr, &errMsg) != SQLITE_OK) {
-        std::cerr << "[DB WORKER ERROR] Failed to initialize table schema: " << errMsg << std::endl;
-        sqlite3_free(errMsg);
-        sqlite3_close(db);
-        return;
-    } 
-    else {
-        std::cout << "[DB WORKER] SQLite database and schema verified successfully." << std::endl;
-    }
+    std::cout << "[DB CLOUD WORKER] Launching asynchronous database consumer thread..." << std::endl;
 
-    while (!should_shutdown.load()) {
-        std::unique_lock<std::mutex> lock(alertMutex_);
-        alertCv_.wait(lock, [this, &should_shutdown]() { 
-            return !alertQueue_.empty() || should_shutdown.load(); 
-        });
-        // Break out if shutdown is requested and no more alerts are left to write
-        if (alertQueue_.empty() && should_shutdown.load()) {
-            break;
-        }
-        AnomalyAlert alert = alertQueue_.front();
-        alertQueue_.pop();
-        lock.unlock();
+    try {
+        // Establish Secure Remote Connection to Supabase Connection Pooler
+        const char* env_conn = std::getenv("SUPABASE_CONN_STR");
+        std::string conn_str;
 
-        sqlite3_stmt *stmt = nullptr;
-        const char *insertSQL = "INSERT INTO anomaly_alerts (timestamp, metric_type, violated_value, threshold_boundary) VALUES (?, ?, ?, ?);";
-        
-        if (sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nullptr) == SQLITE_OK) {
-            // Bind fields (1-indexed parameters matching the '?' placeholders)
-            sqlite3_bind_int64(stmt, 1, alert.timestamp);
-            sqlite3_bind_text(stmt, 2, alert.metric_type.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_double(stmt, 3, alert.violated_value);
-            sqlite3_bind_double(stmt, 4, alert.threshold_boundary);
-            
-            // Execute statement execution step
-            if (sqlite3_step(stmt) != SQLITE_DONE) {
-                std::cerr << "[DB WORKER ERROR] Failed to execute anomaly alert insert: " 
-                          << sqlite3_errmsg(db) << std::endl;
-            }
-            
-            // Destroy statement handle to clear temporary memory
-            sqlite3_finalize(stmt);
+        if (env_conn != nullptr) {
+            conn_str = std::string(env_conn);
         } 
         else {
-            std::cerr << "[DB WORKER ERROR] Failed to prepare insert statement: " 
-                      << sqlite3_errmsg(db) << std::endl;
+            std::cerr << "[DB CLOUD WORKER ERROR] SUPABASE_CONN_STR environment variable is NOT set!" << std::endl;
+            return;
         }
-    }
 
-    // Safely release file-descriptor connection locks before exiting thread execution context
-    if (db) {
-        sqlite3_close(db);
-        std::cout << "[DB WORKER] SQLite database connection closed cleanly." << std::endl;
+        // Append the security mode if it's not already in the string
+        if (conn_str.find("sslmode=") == std::string::npos) {
+            if (conn_str.find("?") == std::string::npos) {
+                conn_str += "?sslmode=require";
+            } else {
+                conn_str += "&sslmode=require";
+            }
+        }
+        
+        pqxx::connection c(conn_str);
+        if (c.is_open()) {
+            std::cout << "[DB CLOUD WORKER] Successfully established persistent WAN tunnel to Supabase!" << std::endl;
+        }
+
+        // Provision Storage Schema Remotely (Idempotent Execution)
+        pqxx::work schema_tx(c);
+        schema_tx.exec(
+            "CREATE TABLE IF NOT EXISTS anomaly_alerts ("
+            "id SERIAL PRIMARY KEY,"
+            "timestamp BIGINT NOT NULL,"
+            "metric_type TEXT NOT NULL,"
+            "violated_value DOUBLE PRECISION NOT NULL,"
+            "threshold_boundary DOUBLE PRECISION NOT NULL,"
+            "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
+            ");"
+        );
+        schema_tx.commit();
+
+        while (!should_shutdown.load()) {
+            std::unique_lock<std::mutex> lock(alertMutex_);
+            alertCv_.wait(lock, [this, &should_shutdown]() { 
+                return !alertQueue_.empty() || should_shutdown.load(); 
+            });
+            // Break out if shutdown is requested and no more alerts are left to write
+            if (alertQueue_.empty() && should_shutdown.load()) {
+                break;
+            }
+            AnomalyAlert alert = alertQueue_.front();
+            alertQueue_.pop();
+            lock.unlock();
+            
+            try {
+                // Stream the record straight across the internet via transaction contexts
+                pqxx::work write_tx(c);
+                write_tx.exec(
+                    "INSERT INTO anomaly_alerts (timestamp, metric_type, violated_value, threshold_boundary) VALUES ($1, $2, $3, $4);", 
+                    pqxx::params{
+                        alert.timestamp, 
+                        alert.metric_type, 
+                        alert.violated_value, 
+                        alert.threshold_boundary
+                    }
+                );
+                write_tx.commit(); // Finishes cloud synchronization transaction cleanly
+                
+            } 
+            catch (const std::exception &write_err) {
+                std::cerr << "[DB CLOUD WORKER WRITE FAILURE] Transaction aborted: " << write_err.what() << std::endl;
+                // In enterprise systems, you would route failed metrics to a local dead-letter disk cache here
+            }
+        }
+    } 
+    catch (const std::exception &e) {
+        std::cerr << "[DB CLOUD WORKER FATAL ERROR] Connection path dropped: " << e.what() << std::endl;
     }
+        
+   std::cout << "[DB CLOUD WORKER] Asynchronous Cloud Postgres consumer thread exited cleanly." << std::endl;
 }
 
 void DetectionEngine::stopAlertWorker() {
