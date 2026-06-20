@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: metrics_postgres
+    environment:
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+      POSTGRES_DB: System-Metrics-Anomaly-Detection
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry_user -d System-Metrics-Anomaly-Detection"]
+      interval: 5s
+      timeout: 5s
+      retries: 5    
+  inference_server:
+    build: .
+    container_name: metrics_inference_server
+    ports:
+      - "50051:50051"
+    environment:
+      - DB_HOST=postgres_db
+      - DB_USER=telemetry_user
+      - DB_PASSWORD=telemetry_password
+      - DB_NAME=System-Metrics-Anomaly-Detection
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
