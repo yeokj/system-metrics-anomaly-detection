@@ -10,6 +10,7 @@ RUN apk add --no-cache \
     grpc-dev \
     protobuf-dev \
     libpq-dev \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/testing \
     libpqxx-dev
 
 WORKDIR /app
@@ -35,6 +36,7 @@ RUN apk add --no-cache \
     grpc \
     protobuf \
     libpq \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.19/testing \
     libpqxx
 
 # Transfer compiled executable artifacts from builder stage
