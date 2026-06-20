@@ -1,6 +1,8 @@
 # Multi-stage build: Compilation environment
 FROM alpine:3.19 AS builder
 
+LABEL org.opencontainers.image.source="https://github.com/yeokj/system-metrics-anomaly-detection"
+
 # Install development tools and dependency headers
 RUN apk add --no-cache \
     build-base \
