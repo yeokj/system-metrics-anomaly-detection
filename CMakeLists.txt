@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(SystemMetricsAnomalyDetection LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find Protobuf compiler and libraries, and gRPC package and its internal C++ plugin target
@@ -21,6 +21,25 @@ else()
 endif()
 
 find_package(Protobuf REQUIRED)
+
+find_path(PQXX_INCLUDE_DIR NAMES pqxx/pqxx)
+
+find_path(POSTGRES_INCLUDE_DIR 
+    NAMES libpq-fe.h
+    PATH_SUFFIXES postgresql
+)
+
+find_library(PQXX_LIB NAMES pqxx 
+    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+)
+
+find_library(PQ_LIB NAMES pq libpq 
+    PATHS 
+        /opt/homebrew/opt/libpq/lib
+        /opt/homebrew/lib 
+        /usr/local/lib 
+        /usr/lib
+)
 
 # Paths to store the generated source files
 set(PROTO_SRCS "${CMAKE_CURRENT_BINARY_DIR}/metrics.pb.cc")
@@ -56,22 +75,40 @@ add_executable(InferenceServer
 )
 
 # Target Include Paths (Configured after targets are created)
-target_include_directories(TelemetryGenerator PRIVATE cpp/include ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(InferenceServer PRIVATE cpp/include ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(TelemetryGenerator 
+    PRIVATE 
+        cpp/include 
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${PQXX_INCLUDE_DIR}
+        ${POSTGRES_INCLUDE_DIR}
+)
+target_include_directories(InferenceServer 
+    PRIVATE 
+        cpp/include 
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${PQXX_INCLUDE_DIR}
+        ${POSTGRES_INCLUDE_DIR}
+)
 
 # System Library Linkage
 find_package(Threads REQUIRED)
+
+find_library(PQXX_LIB NAMES pqxx)
+find_library(PQ_LIB NAMES pq)
+
 target_link_libraries(TelemetryGenerator 
     PRIVATE 
         Threads::Threads
         ${GRPC_LIBRARIES}
         protobuf::libprotobuf
-        sqlite3
+        ${PQXX_LIB}
+        ${PQ_LIB}
 )
 target_link_libraries(InferenceServer 
     PRIVATE 
     Threads::Threads
     ${GRPC_LIBRARIES}
     protobuf::libprotobuf
-    sqlite3
+    ${PQXX_LIB}
+    ${PQ_LIB}
 )
