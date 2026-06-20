@@ -16,6 +16,7 @@ simulation_research
 .DS_Store
 .AppleDouble
 .LSOverride
+.vscode
 
 # Local SQLite Runtime Artifacts
 *.db
