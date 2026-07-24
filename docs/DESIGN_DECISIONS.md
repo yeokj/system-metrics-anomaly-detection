@@ -57,3 +57,19 @@
 ### 5. Dynamic CLI Target Resolution for Hybrid Deployments
 * **Decision:** Extended `telemetry_generator.cpp` with command-line argument parsing (`argc`/`argv`).
 * **Rationale:** Hardcoding IP addresses creates brittle codebases. Enabling CLI target overrides allows the exact same client binary to execute against `localhost:50051` for fast local development loops or route across internal GCP VPC networks (`10.150.0.2:50051`) without re-compilation.
+
+---
+
+## Phase 4: Production Storage & Cloud Proxy Ingestion
+
+### 1. Externalizing Credentials to Isolated Runtime Contexts
+* **Decision:** Extracted the raw PostgreSQL connection URI from source control and migrated credential loading to dynamic runtime extraction via `std::getenv("SUPABASE_CONN_STR")`.
+* **Rationale:** Hardcoding master database passwords inside source code violates fundamental security practices and leads to catastrophic secret leakage if pushed to open repositories. By extracting connection profiles entirely to environment contexts, the system becomes secure, platform-agnostic, and completely ready for stateless cloud deployment models like Docker or Kubernetes.
+
+### 2. Transaction-Agnostic Query Architecture over Proxy Gates (PgBouncer)
+* **Decision:** Removed session-pinned prepared statements (`c.prepare`) from thread boot contexts and replaced them with dynamic inline parameterized execution blocks (`write_tx.exec`) handled through `pqxx::params`.
+* **Rationale:** Production cloud databases handle traffic surges by funneling TCP sockets through transaction pooling proxies (like PgBouncer on port `6543`). Because these proxies map multiple application connections to the same physical database session backend, trying to register a session-bound prepared statement across shared sessions throws a duplicate statement exception and terminates the database driver context. Utilizing inline parameterized wrappers ensures maximum throughput via PgBouncer while preserving total immunity against SQL injection attacks.
+
+### 3. Idempotent Target Schema Self-Provisioning
+* **Decision:** Embedded automatic DDL table execution blocks (`CREATE TABLE IF NOT EXISTS anomaly_alerts`) within the database worker initialization sequence.
+* **Rationale:** Separating database setup scripts from application binary execution builds brittle deployment dependencies. By making storage layer schema definition fully idempotent and self-contained within the C++ source initialization sequence, the engine guarantees that database targets are verified, structured, and active the exact microsecond a WAN network socket link wakes up.
