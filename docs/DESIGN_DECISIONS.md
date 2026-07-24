@@ -33,3 +33,27 @@
 ### 4. Dynamic Fallback Dependency Resolution in CMake
 * **Decision:** Extended `CMakeLists.txt` to attempt gRPC discovery via native CMake config packages (`find_package(gRPC CONFIG)`) with automated fallbacks to `PkgConfig` (`pkg_check_modules`).
 * **Rationale:** Eliminates brittle, host-dependent library paths. Ensures seamless cross-environment builds regardless of whether gRPC is installed via Homebrew on macOS, custom source compiles, or system `apt` packages on Linux VM instances.
+
+---
+
+## Phase 3: Ultra-Low Latency Optimization (Lock-Free)
+
+### 1. Lock-Free SPSC Ring Buffer over Mutex Synchronization
+* **Decision:** Replaced standard OS-level mutex and condition variable synchronization with a custom, template-based Single-Producer Single-Consumer (SPSC) Ring Buffer utilizing `std::atomic` pointers.
+* **Rationale:** OS-level locks introduce severe thread scheduling contention, kernel context switches, and non-deterministic latency spikes at microsecond scales. Utilizing lock-free atomic `memory_order_acquire` and `memory_order_release` operations guarantees memory visibility across producer and consumer threads without ever blocking execution.
+
+### 2. Hardware Cache Alignment (`alignas(64)`) to Eliminate False Sharing
+* **Decision:** Enforced explicit 64-byte hardware cache boundary padding (`alignas(64)`) on atomic head/tail indexes and internal buffer structures.
+* **Rationale:** In multi-core CPU architectures, adjacent variables sharing a single 64-byte L1 cache line cause hardware false sharing—where modifications by one thread force cache line invalidations on other cores. Isolating read and write offsets onto independent physical cache lines preserves L1/L2 cache locality and eliminates memory bus thrashing.
+
+### 3. Asynchronous Network & Compute Decoupling (Strategy B)
+* **Decision:** Refactored `InferenceServer` to isolate gRPC stream ingestion from machine learning evaluation into separate execution threads.
+* **Rationale:** Performing computational validation or I/O directly inside the gRPC `StreamMetrics` thread forces socket read buffers to stall. Decoupling the pipeline allows incoming network packets to be pushed to the queue in nanoseconds, while a background consumer thread executes Z-score calculations asynchronously.
+
+### 4. OS Scheduler Cooperation via `std::this_thread::yield()`
+* **Decision:** Integrated microsecond CPU throttling in the background worker loop during queue underrun (empty state) conditions.
+* **Rationale:** Tight busy-wait polling on empty lock-free queues pins CPU cores to 100% utilization. Yielding execution time slices back to the operating system scheduler prevents core pinning during idle stream windows without incurring heavy thread sleep latency.
+
+### 5. Dynamic CLI Target Resolution for Hybrid Deployments
+* **Decision:** Extended `telemetry_generator.cpp` with command-line argument parsing (`argc`/`argv`).
+* **Rationale:** Hardcoding IP addresses creates brittle codebases. Enabling CLI target overrides allows the exact same client binary to execute against `localhost:50051` for fast local development loops or route across internal GCP VPC networks (`10.150.0.2:50051`) without re-compilation.
