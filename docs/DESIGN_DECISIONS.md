@@ -73,3 +73,25 @@
 ### 3. Idempotent Target Schema Self-Provisioning
 * **Decision:** Embedded automatic DDL table execution blocks (`CREATE TABLE IF NOT EXISTS anomaly_alerts`) within the database worker initialization sequence.
 * **Rationale:** Separating database setup scripts from application binary execution builds brittle deployment dependencies. By making storage layer schema definition fully idempotent and self-contained within the C++ source initialization sequence, the engine guarantees that database targets are verified, structured, and active the exact microsecond a WAN network socket link wakes up.
+
+---
+
+## Phase 5: Containerization & Continuous Deployment
+
+### Decision 1: Multi-Stage Container Builds for C++ Microservices
+* **Context**: Building C++ applications with gRPC and PostgreSQL client bindings requires heavy development packages (`build-essential`, `cmake`, `libgrpc++-dev`, `libpqxx-dev`). Standard single-stage container builds retain these compilation tools in the production image, introducing security vulnerabilities and bloated image sizes.
+* **Alternative Considered**: Single-stage Ubuntu container housing both development tools and runtime execution paths.
+* **Decision**: Adopted a multi-stage Docker compilation pattern (`ubuntu:24.04`). The `builder` stage compiles release binaries and Protobuf definitions from raw source, while the final `runtime` stage copies *only* the compiled binaries (`InferenceServer`, `TelemetryGenerator`) and serialized model parameters (`model_params.json`).
+* **Rationale**: Decouples the development toolchain from the execution footprint, reducing attack vectors and ensuring lightweight runtime deployment.
+
+### Decision 2: Automated Pipeline Orchestration & Container Registry Publishing
+* **Context**: Manual binary compilation and local container tagging risk environment drift and broken builds reaching production repos.
+* **Alternative Considered**: Local container builds manually pushed to Docker Hub or relying purely on local CMake execution.
+* **Decision**: Engineered an automated GitHub Actions CI/CD pipeline (`.github/workflows/ci.yml`) featuring parallel linting (`flake8`), native C++ compilation verification, and automated Docker container deployment to GitHub Container Registry (`ghcr.io`).
+* **Rationale**: Enforces strict automated validation gates on every commit/PR to `main`. Automatically tags, labels (OCI standards), and publishes immutable production packages directly to `ghcr.io`, eliminating manual release overhead and providing instant `docker pull` capabilities.
+
+### Decision 3: Service Health Interlocks in Docker Compose
+* **Context**: The gRPC C++ inference server requires active PostgreSQL socket endpoints to handle anomaly persistent logging upon startup. Launching containers in parallel causes race conditions where the inference server boots before the database daemon initializes.
+* **Alternative Considered**: Application-level sleep loops or retry logic in C++ code.
+* **Decision**: Configured explicit service dependency interlocks in `docker-compose.yml` using `depends_on` bound to a native PostgreSQL `healthcheck` (`pg_isready`).
+* **Rationale**: Keeps database readiness logic at the infrastructure orchestration level rather than polluting application code, guaranteeing deterministic multi-container startup sequences.
