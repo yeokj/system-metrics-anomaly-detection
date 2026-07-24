@@ -4,6 +4,8 @@
 Phase 5 transitions the system from a locally-compiled backend service into a production-grade, containerized infrastructure suite backed by an automated Continuous Integration and Continuous Deployment (CI/CD) pipeline. 
 
 By leveraging Docker multi-stage builds and GitHub Actions, the system isolates compilation tools from the runtime execution footprint, enforces automated build/lint verification on every pull request, and publishes pre-compiled, immutable container images directly to the GitHub Container Registry (`ghcr.io`).
+
+```text
 [Local Code / Push]
        │
        ▼
@@ -19,6 +21,7 @@ By leveraging Docker multi-stage builds and GitHub Actions, the system isolates 
                      │ GitHub Packages       │
                      │ (ghcr.io Container)   │
                      └───────────────────────┘
+```
 
 ---
 
